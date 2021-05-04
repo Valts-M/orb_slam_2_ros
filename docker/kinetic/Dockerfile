@@ -25,8 +25,7 @@ RUN apt-get install software-properties-common apt-utils -y
 RUN add-apt-repository "deb http://realsense-hw-public.s3.amazonaws.com/Debian/apt-repo xenial main" -u
 
 # Install required realsense and ROS packages
-RUN apt-get install librealsense2-dkms librealsense2-utils librealsense2-dev \
-    librealsense2-dbg ros-kinetic-rgbd-launch ros-kinetic-tf2-geometry-msgs python-catkin-tools -y
+RUN apt-get install librealsense2-dkms librealsense2-utils librealsense2-dev librealsense2-dbg ros-kinetic-rgbd-launch python-catkin-tools -y
 
 # Install ROS dependencies
 RUN rosdep update \
@@ -36,7 +35,3 @@ RUN rosdep update \
 RUN catkin config \
       --extend /opt/ros/$ROS_DISTRO && \
     catkin build
-
-RUN echo "source /home/devel/setup.bash" >> /$HOME/.bashrc
-
-CMD "bash"

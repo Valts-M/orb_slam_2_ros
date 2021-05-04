@@ -429,7 +429,6 @@ ORBextractor::ORBextractor(int _nfeatures, float _scaleFactor, int _nlevels,
         mvInvScaleFactor[i]=1.0f/mvScaleFactor[i];
         mvInvLevelSigma2[i]=1.0f/mvLevelSigma2[i];
     }
-
     mvImagePyramid.resize(nlevels);
 
     mnFeaturesPerLevel.resize(nlevels);
@@ -578,15 +577,18 @@ vector<cv::KeyPoint> ORBextractor::DistributeOctTree(const vector<cv::KeyPoint>&
             lit->bNoMore=true;
             lit++;
         }
-        else if(lit->vKeys.empty())
+        else if(lit->vKeys.empty()){
             lit = lNodes.erase(lit);
-        else
+        }
+        else{
             lit++;
+        }
     }
 
     bool bFinish = false;
 
     int iteration = 0;
+    cout << "lnodes size == " << lNodes.size() << endl;
 
     vector<pair<int,ExtractorNode*> > vSizeAndPointerToNode;
     vSizeAndPointerToNode.reserve(lNodes.size()*4);
@@ -1048,16 +1050,13 @@ void ORBextractor::operator()( InputArray _image, InputArray _mask, vector<KeyPo
 
     Mat image = _image.getMat();
     assert(image.type() == CV_8UC1 );
-
     // Pre-compute the scale pyramid
     ComputePyramid(image);
-
     vector < vector<KeyPoint> > allKeypoints;
     ComputeKeyPointsOctTree(allKeypoints);
     //ComputeKeyPointsOld(allKeypoints);
 
     Mat descriptors;
-
     int nkeypoints = 0;
     for (int level = 0; level < nlevels; ++level)
         nkeypoints += (int)allKeypoints[level].size();
@@ -1068,7 +1067,7 @@ void ORBextractor::operator()( InputArray _image, InputArray _mask, vector<KeyPo
         _descriptors.create(nkeypoints, 32, CV_8U);
         descriptors = _descriptors.getMat();
     }
-
+    cout << "nkeypoints = "<<nkeypoints << endl;
     _keypoints.clear();
     _keypoints.reserve(nkeypoints);
 
@@ -1077,7 +1076,6 @@ void ORBextractor::operator()( InputArray _image, InputArray _mask, vector<KeyPo
     {
         vector<KeyPoint>& keypoints = allKeypoints[level];
         int nkeypointsLevel = (int)keypoints.size();
-
         if(nkeypointsLevel==0)
             continue;
 

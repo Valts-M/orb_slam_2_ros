@@ -29,6 +29,7 @@
 #include "ORBVocabulary.h"
 #include "KeyFrame.h"
 #include "ORBextractor.h"
+#include "Cloud2Img.h"
 
 #include <opencv2/opencv.hpp>
 
@@ -96,7 +97,8 @@ public:
     void ComputeStereoFromRGBD(const cv::Mat &imDepth);
 
     // Backprojects a keypoint (if stereo/depth info available) into 3D world coordinates.
-    cv::Mat UnprojectStereo(const int &i);
+    cv::Mat UnprojectStereo(const int &i, const int &msensor);
+
 
 public:
     // Vocabulary used for relocalization.

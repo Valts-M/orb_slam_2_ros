@@ -339,11 +339,11 @@ void LocalMapping::CreateNewMapPoints()
             }
             else if(bStereo1 && cosParallaxStereo1<cosParallaxStereo2)
             {
-                x3D = mpCurrentKeyFrame->UnprojectStereo(idx1);
+                x3D = mpCurrentKeyFrame->UnprojectStereo(idx1, mpTracker->mSensor);
             }
             else if(bStereo2 && cosParallaxStereo2<cosParallaxStereo1)
             {
-                x3D = pKF2->UnprojectStereo(idx2);
+                x3D = pKF2->UnprojectStereo(idx2, mpTracker->mSensor);
             }
             else
                 continue; //No stereo and very low parallax

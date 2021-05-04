@@ -104,7 +104,6 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
         cout << "- color order: BGR (ignored if grayscale)" << endl;
 
     mpORBextractorLeft = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
-
     if(sensor==System::STEREO)
         mpORBextractorRight = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 
@@ -118,13 +117,13 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
     cout << "- Initial Fast Threshold: " << fIniThFAST << endl;
     cout << "- Minimum Fast Threshold: " << fMinThFAST << endl;
 
-    if(sensor==System::STEREO || sensor==System::RGBD)
+    if(sensor==System::STEREO || sensor==System::RGBD || sensor==System::LIDAR)
     {
         mThDepth = mbf*(float)mThDepth/parameters.fx;
         cout << endl << "Depth Threshold (Close/Far Points): " << mThDepth << endl;
     }
 
-    if(sensor==System::RGBD)
+    if(sensor==System::RGBD || sensor==System::LIDAR)
     {
         if(fabs(mDepthMapFactor)<1e-5)
             mDepthMapFactor=1;
@@ -204,14 +203,42 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const d
         else
             cvtColor(mImGray,mImGray,CV_BGRA2GRAY);
     }
-
     if((fabs(mDepthMapFactor-1.0f)>1e-5) || imDepth.type()!=CV_32F)
         imDepth.convertTo(imDepth,CV_32F,mDepthMapFactor);
-
     mCurrentFrame = Frame(mImGray,imDepth,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
-
     Track();
+    return mCurrentFrame.mTcw.clone();
+}
 
+cv::Mat Tracking::GrabImageLidar(const sensor_msgs::PointCloud2ConstPtr& msgLidar)
+{
+    cv::Mat im =  cv::Mat(64, 1800, CV_8U); //TODO: replace magic numbers with parameters)
+    cv::Mat imD = cv::Mat(64, 1800, CV_32FC1);
+    Cloud2Img lidarConverter{};
+    lidarConverter.MakeImages(msgLidar, im, imD);
+
+    const double timestamp = msgLidar->header.stamp.toSec();
+    mImGray = im;
+    cv::Mat imDepth = imD;
+//
+//    if(mImGray.channels()==3)
+//    {
+//        if(mbRGB)
+//            cvtColor(mImGray,mImGray,CV_RGB2GRAY);
+//        else
+//            cvtColor(mImGray,mImGray,CV_BGR2GRAY);
+//    }
+//    else if(mImGray.channels()==4)
+//    {
+//        if(mbRGB)
+//            cvtColor(mImGray,mImGray,CV_RGBA2GRAY);
+//        else
+//            cvtColor(mImGray,mImGray,CV_BGRA2GRAY);
+//    }
+//    if((fabs(mDepthMapFactor-1.0f)>1e-5) || imDepth.type()!=CV_32F)
+//        imDepth.convertTo(imDepth,CV_32F,mDepthMapFactor);
+    mCurrentFrame = Frame(mImGray,imDepth,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
+    Track();
     return mCurrentFrame.mTcw.clone();
 }
 
@@ -259,7 +286,7 @@ void Tracking::Track()
 
     if(mState==NOT_INITIALIZED)
     {
-        if(mSensor==System::STEREO || mSensor==System::RGBD)
+        if(mSensor==System::STEREO || mSensor==System::RGBD || mSensor==System::LIDAR)
             StereoInitialization();
         else
             MonocularInitialization();
@@ -506,7 +533,7 @@ void Tracking::StereoInitialization()
             float z = mCurrentFrame.mvDepth[i];
             if(z>0)
             {
-                cv::Mat x3D = mCurrentFrame.UnprojectStereo(i);
+                cv::Mat x3D = mCurrentFrame.UnprojectStereo(i, mSensor);
                 MapPoint* pNewMP = new MapPoint(x3D,pKFini,mpMap);
                 pNewMP->AddObservation(pKFini,i);
                 pKFini->AddMapPoint(pNewMP,i);
@@ -664,7 +691,7 @@ void Tracking::CreateInitialMapMonocular()
     // Bundle Adjustment
     cout << "New Map created with " << mpMap->MapPointsInMap() << " points" << endl;
 
-    Optimizer::GlobalBundleAdjustemnt(mpMap,20);
+    //Optimizer::GlobalBundleAdjustemnt(mpMap,20);
 
     // Set median depth to 1
     float medianDepth = pKFini->ComputeSceneMedianDepth(2);
@@ -753,7 +780,7 @@ bool Tracking::TrackReferenceKeyFrame()
     mCurrentFrame.mvpMapPoints = vpMapPointMatches;
     mCurrentFrame.SetPose(mLastFrame.mTcw);
 
-    Optimizer::PoseOptimization(&mCurrentFrame);
+    //Optimizer::PoseOptimization(&mCurrentFrame);
 
     // Discard outliers
     int nmatchesMap = 0;
@@ -827,7 +854,7 @@ void Tracking::UpdateLastFrame()
 
         if(bCreateNew)
         {
-            cv::Mat x3D = mLastFrame.UnprojectStereo(i);
+            cv::Mat x3D = mLastFrame.UnprojectStereo(i, mSensor);
             MapPoint* pNewMP = new MapPoint(x3D,mpMap,&mLastFrame,i);
 
             mLastFrame.mvpMapPoints[i]=pNewMP;
@@ -876,7 +903,7 @@ bool Tracking::TrackWithMotionModel()
         return false;
 
     // Optimize frame pose with all matches
-    Optimizer::PoseOptimization(&mCurrentFrame);
+    //Optimizer::PoseOptimization(&mCurrentFrame);
 
     // Discard outliers
     int nmatchesMap = 0;
@@ -918,7 +945,7 @@ bool Tracking::TrackLocalMap()
     SearchLocalPoints();
 
     // Optimize Pose
-    Optimizer::PoseOptimization(&mCurrentFrame);
+    //Optimizer::PoseOptimization(&mCurrentFrame);
     mnMatchesInliers = 0;
 
     // Update MapPoints Statistics
@@ -1091,7 +1118,7 @@ void Tracking::CreateNewKeyFrame()
 
                 if(bCreateNew)
                 {
-                    cv::Mat x3D = mCurrentFrame.UnprojectStereo(i);
+                    cv::Mat x3D = mCurrentFrame.UnprojectStereo(i, mSensor);
                     MapPoint* pNewMP = new MapPoint(x3D,pKF,mpMap);
                     pNewMP->AddObservation(pKF,i);
                     pKF->AddMapPoint(pNewMP,i);
@@ -1418,7 +1445,7 @@ bool Tracking::Relocalization()
                         mCurrentFrame.mvpMapPoints[j]=NULL;
                 }
 
-                int nGood = Optimizer::PoseOptimization(&mCurrentFrame);
+                int nGood = 60; //Optimizer::PoseOptimization(&mCurrentFrame);
 
                 if(nGood<10)
                     continue;

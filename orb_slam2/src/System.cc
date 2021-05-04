@@ -53,6 +53,8 @@ System::System(const string strVocFile, const eSensor sensor, ORBParameters& par
         cout << "Stereo" << endl;
     else if(mSensor==RGBD)
         cout << "RGB-D" << endl;
+    else if(mSensor==LIDAR)
+        cout << "Lidar" << endl;
 
     //Load ORB Vocabulary
     cout << endl << "Loading ORB Vocabulary." << endl;
@@ -175,6 +177,7 @@ void System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const do
 
 void System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp)
 {
+    cout << mSensor << endl;
     if(mSensor!=RGBD)
     {
         cerr << "ERROR: you called TrackRGBD but input sensor was not set to RGBD." << endl;
@@ -204,7 +207,6 @@ void System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double 
             mbDeactivateLocalizationMode = false;
         }
     }
-
     // Check reset
     {
     unique_lock<mutex> lock(mMutexReset);
@@ -214,9 +216,54 @@ void System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double 
         mbReset = false;
     }
     }
-
     cv::Mat Tcw = mpTracker->GrabImageRGBD(im,depthmap,timestamp);
+    unique_lock<mutex> lock2(mMutexState);
+    mTrackingState = mpTracker->mState;
+    mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
+    mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
+    current_position_ = Tcw;
+}
 
+void System::TrackLidar(const sensor_msgs::PointCloud2ConstPtr& msgLidar)
+{
+    if(mSensor!=LIDAR) {
+        cerr << "ERROR: you called TrackLidar but input sensor was not set to Lidar." << endl;
+        exit(-1);
+    }
+
+    // Check mode change
+    {
+        unique_lock<mutex> lock(mMutexMode);
+        if(mbActivateLocalizationMode)
+        {
+            mpLocalMapper->RequestStop();
+
+            // Wait until Local Mapping has effectively stopped
+            while(!mpLocalMapper->isStopped())
+            {
+                std::this_thread::sleep_for(std::chrono::microseconds(1000));
+            }
+
+            mpTracker->InformOnlyTracking(true);
+            mbActivateLocalizationMode = false;
+        }
+        if(mbDeactivateLocalizationMode)
+        {
+            mpTracker->InformOnlyTracking(false);
+            mpLocalMapper->Release();
+            mbDeactivateLocalizationMode = false;
+        }
+    }
+    // Check reset
+    {
+        unique_lock<mutex> lock(mMutexReset);
+        if(mbReset)
+        {
+            mpTracker->Reset();
+            mbReset = false;
+        }
+    }
+    cv::Mat Tcw = mpTracker->GrabImageLidar(msgLidar);
     unique_lock<mutex> lock2(mMutexState);
     mTrackingState = mpTracker->mState;
     mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
@@ -409,7 +456,7 @@ void System::SaveKeyFrameTrajectoryTUM(const string &filename)
     cout << endl << "trajectory saved!" << endl;
 }
 
-void System::SaveTrajectoryKITTI(const string &filename)
+void System::SaveTrajectoryKITTI(const string &filename, const string &timestamp)
 {
     cout << endl << "Saving camera trajectory to " << filename << " ..." << endl;
     if(mSensor==MONOCULAR)
@@ -428,6 +475,10 @@ void System::SaveTrajectoryKITTI(const string &filename)
     ofstream f;
     f.open(filename.c_str());
     f << fixed;
+    
+    ofstream t;
+    t.open(timestamp.c_str());
+    t << fixed;
 
     // Frame pose is stored relative to its reference keyframe (which is optimized by BA and pose graph).
     // We need to get first the keyframe pose and then concatenate the relative transformation.
@@ -459,8 +510,10 @@ void System::SaveTrajectoryKITTI(const string &filename)
         f << setprecision(9) << Rwc.at<float>(0,0) << " " << Rwc.at<float>(0,1)  << " " << Rwc.at<float>(0,2) << " "  << twc.at<float>(0) << " " <<
              Rwc.at<float>(1,0) << " " << Rwc.at<float>(1,1)  << " " << Rwc.at<float>(1,2) << " "  << twc.at<float>(1) << " " <<
              Rwc.at<float>(2,0) << " " << Rwc.at<float>(2,1)  << " " << Rwc.at<float>(2,2) << " "  << twc.at<float>(2) << endl;
+        t << *lT << endl;
     }
     f.close();
+    t.close();
     cout << endl << "trajectory saved!" << endl;
 }
 

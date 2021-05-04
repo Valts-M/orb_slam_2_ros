@@ -122,7 +122,6 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 {
     // Frame ID
     mnId=nNextId++;
-
     // Scale Level Info
     mnScaleLevels = mpORBextractorLeft->GetLevels();
     mfScaleFactor = mpORBextractorLeft->GetScaleFactor();    
@@ -135,10 +134,11 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
     // ORB extraction
     ExtractORB(0,imGray);
 
-    N = mvKeys.size();
-
-    if(mvKeys.empty())
+    if(mvKeys.empty()){
+        cout << "no keypoints" << endl;
         return;
+    }
+    N = mvKeys.size();
 
     UndistortKeyPoints();
 
@@ -259,7 +259,7 @@ void Frame::SetPose(cv::Mat Tcw)
 }
 
 void Frame::UpdatePoseMatrices()
-{ 
+{
     mRcw = mTcw.rowRange(0,3).colRange(0,3);
     mRwc = mRcw.t();
     mtcw = mTcw.rowRange(0,3).col(3);
@@ -663,15 +663,24 @@ void Frame::ComputeStereoFromRGBD(const cv::Mat &imDepth)
     }
 }
 
-cv::Mat Frame::UnprojectStereo(const int &i)
+cv::Mat Frame::UnprojectStereo(const int &i, const int &msensor)
 {
-    const float z = mvDepth[i];
+    float z = mvDepth[i];
     if(z>0)
     {
         const float u = mvKeysUn[i].pt.x;
         const float v = mvKeysUn[i].pt.y;
-        const float x = (u-cx)*z*invfx;
-        const float y = (v-cy)*z*invfy;
+        float x;
+        float y;
+        if(msensor != 3){               //3 == lidar
+             x = (u-cx)*z*invfx;
+             y = (v-cy)*z*invfy;
+        }
+        else{
+            Cloud2Img lidarConverter{};
+            lidarConverter.GetReprojection(u, v, x, y, z);
+        }
+
         cv::Mat x3Dc = (cv::Mat_<float>(3,1) << x, y, z);
         return mRwc*x3Dc+mOw;
     }

@@ -34,9 +34,9 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 #include <dynamic_reconfigure/server.h>
-#include <orb_slam2_ros/dynamic_reconfigureConfig.h>
+//#include <orb_slam2_ros/dynamic_reconfigureConfig.h>
 
-#include "orb_slam2_ros/SaveMap.h"
+//#include "orb_slam2_ros/SaveMap.h"
 
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
@@ -71,8 +71,8 @@ class Node
     void PublishPositionAsPoseStamped(cv::Mat position);
     void PublishGBAStatus (bool gba_status);
     void PublishRenderedImage (cv::Mat image);
-    void ParamsChangedCallback(orb_slam2_ros::dynamic_reconfigureConfig &config, uint32_t level);
-    bool SaveMapSrv (orb_slam2_ros::SaveMap::Request &req, orb_slam2_ros::SaveMap::Response &res);
+    //void ParamsChangedCallback(orb_slam2_ros::dynamic_reconfigureConfig &config, uint32_t level);
+    //bool SaveMapSrv (orb_slam2_ros::SaveMap::Request &req, orb_slam2_ros::SaveMap::Response &res);
     void LoadOrbParameters (ORB_SLAM2::ORBParameters& parameters);
 
     // initialization Transform listener
@@ -83,7 +83,7 @@ class Node
     tf2::Transform TransformToTarget (tf2::Transform tf_in, std::string frame_in, std::string frame_target);
     sensor_msgs::PointCloud2 MapPointsToPointCloud (std::vector<ORB_SLAM2::MapPoint*> map_points);
 
-    dynamic_reconfigure::Server<orb_slam2_ros::dynamic_reconfigureConfig> dynamic_param_server_;
+    //dynamic_reconfigure::Server<orb_slam2_ros::dynamic_reconfigureConfig> dynamic_param_server_;
 
     image_transport::Publisher rendered_image_publisher_;
     ros::Publisher map_points_publisher_;

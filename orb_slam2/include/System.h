@@ -54,12 +54,13 @@ public:
     enum eSensor{
         MONOCULAR=0,
         STEREO=1,
-        RGBD=2
+        RGBD=2,
+        LIDAR=3
     };
 
 public:
 
-    // Initialize the SLAM system. It launches the Local Mapping, Loop Closing and Viewer threads.
+    // Initialize the SLAM system. It launches tboolhe Local Mapping, Loop Closing and Viewer threads.
     System(const string strVocFile, const eSensor sensor, ORBParameters& parameters,
            const std::string & map_file = "", bool load_map = false); // map serialization addition
 
@@ -73,6 +74,8 @@ public:
     // Input depthmap: Float (CV_32F).
     // Returns the camera pose (empty if tracking fails).
     void TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp);
+
+    void TrackLidar(const sensor_msgs::PointCloud2ConstPtr& msgLidar);
 
     // Process the given monocular frame
     // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
@@ -110,7 +113,7 @@ public:
     // Only for stereo and RGB-D. This method does not work for monocular.
     // Call first Shutdown()
     // See format details at: http://www.cvlibs.net/datasets/kitti/eval_odometry.php
-    void SaveTrajectoryKITTI(const string &filename);
+    void SaveTrajectoryKITTI(const string &filename, const string &timestamp);
 
     //Checks the current mode (mapping or localization) and changes the mode if requested
     void EnableLocalizationOnly (bool localize_only);

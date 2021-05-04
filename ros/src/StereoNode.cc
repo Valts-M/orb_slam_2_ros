@@ -38,6 +38,7 @@ StereoNode::StereoNode (const ORB_SLAM2::System::eSensor sensor, ros::NodeHandle
 
 
 StereoNode::~StereoNode () {
+    ROS_INFO("DELETING STEREO NODE");
     delete left_sub_;
     delete right_sub_;
     delete sync_;
@@ -64,6 +65,5 @@ void StereoNode::ImageCallback (const sensor_msgs::ImageConstPtr& msgLeft, const
   current_frame_time_ = msgLeft->header.stamp;
 
   orb_slam_->TrackStereo(cv_ptrLeft->image, cv_ptrRight->image, cv_ptrLeft->header.stamp.toSec());
-
   Update ();
 }

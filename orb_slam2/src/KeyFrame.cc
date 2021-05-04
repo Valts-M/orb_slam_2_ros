@@ -612,15 +612,23 @@ bool KeyFrame::IsInImage(const float &x, const float &y) const
     return (x>=mnMinX && x<mnMaxX && y>=mnMinY && y<mnMaxY);
 }
 
-cv::Mat KeyFrame::UnprojectStereo(int i)
+cv::Mat KeyFrame::UnprojectStereo(int i, int &msensor)
 {
-    const float z = mvDepth[i];
+    float z = mvDepth[i];
     if(z>0)
     {
         const float u = mvKeys[i].pt.x;
         const float v = mvKeys[i].pt.y;
-        const float x = (u-cx)*z*invfx;
-        const float y = (v-cy)*z*invfy;
+        float x;
+        float y;
+        if(msensor != 3){               //3 == lidar
+            x = (u-cx)*z*invfx;
+            y = (v-cy)*z*invfy;
+        }
+        else{
+            Cloud2Img lidarConverter{};
+            lidarConverter.GetReprojection(u, v, x, y, z);
+        }
         cv::Mat x3Dc = (cv::Mat_<float>(3,1) << x, y, z);
 
         unique_lock<mutex> lock(mMutexPose);

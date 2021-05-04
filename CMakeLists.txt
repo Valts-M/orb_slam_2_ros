@@ -7,14 +7,16 @@ ENDIF()
 
 # Check for c++11 support
 INCLUDE(CheckCXXCompilerFlag)
-CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX11)
 IF(COMPILER_SUPPORTS_CXX11)
-  set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "-std=c++14 ${CMAKE_CXX_FLAGS}")
 ELSE()
-  MESSAGE(ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
+  MESSAGE(ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++17 support. Please use a different C++ compiler.")
 ENDIF()
 
 LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/orb_slam2/cmake_modules)
+
+set(PCL_DIR "/usr/lib/x86_64-linux-gnu/cmake/pcl/")
 
 find_package (catkin REQUIRED COMPONENTS
 roscpp
@@ -26,6 +28,7 @@ tf
 sensor_msgs
 dynamic_reconfigure
 message_generation
+PCL
 )
 
 find_package(OpenCV 4.0 QUIET)
@@ -65,10 +68,10 @@ ${OpenCV_LIBS}
 ${catkin_LIBRARIES}
 )
 
-add_service_files(
-        FILES
-        SaveMap.srv
-)
+#add_service_files(
+#        FILES
+#        SaveMap.srv
+#)
 
 generate_messages(
         DEPENDENCIES
@@ -76,7 +79,7 @@ generate_messages(
 )
 
 catkin_package (
-  CATKIN_DEPENDS roscpp rospy std_msgs cv_bridge image_transport tf sensor_msgs dynamic_reconfigure message_runtime
+  CATKIN_DEPENDS roscpp rospy std_msgs cv_bridge image_transport tf sensor_msgs dynamic_reconfigure message_runtime pcl_conversions
   LIBRARIES {PROJECT_NAME} libDBoW2 libg2o
 )
 
@@ -84,6 +87,7 @@ include_directories(
 ${PROJECT_SOURCE_DIR}/orb_slam2
 ${PROJECT_SOURCE_DIR}/orb_slam2/include
 ${PROJECT_SOURCE_DIR}/ros/include
+${PCL_INCLUDE_DIRS}
 ${EIGEN3_INCLUDE_DIR}
 ${catkin_INCLUDE_DIRS}
 )
@@ -94,6 +98,7 @@ include(${PROJECT_SOURCE_DIR}/orb_slam2/Thirdparty/g2o/CMakeLists.txt)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/orb_slam2/lib)
 
 add_library(${PROJECT_NAME} SHARED
+orb_slam2/src/Cloud2Img.cpp
 orb_slam2/src/System.cc
 orb_slam2/src/Tracking.cc
 orb_slam2/src/LocalMapping.cc
@@ -116,7 +121,10 @@ add_dependencies (${PROJECT_NAME} g2o DBoW2)
 
 target_link_libraries(${PROJECT_NAME}
 ${LIBS_ORBSLAM}
+${PCL_LIBRARIES}
 )
+
+add_definitions(${PCL_DEFINITIONS})
 
 # map serialization addition - library boost serialization 
 message(STATUS "Compile With map save/load function")
@@ -156,7 +164,18 @@ target_link_libraries(${PROJECT_NAME}_rgbd
 ${LIBS_ROS}
 )
 
-install(TARGETS ${PROJECT_NAME}_mono ${PROJECT_NAME}_stereo ${PROJECT_NAME}_rgbd
+add_executable (${PROJECT_NAME}_lidar
+ros/src/LidarNode.cpp
+ros/src/Node.cc
+)
+add_dependencies (${PROJECT_NAME}_lidar ${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
+
+target_link_libraries(${PROJECT_NAME}_lidar
+${LIBS_ROS}
+${PCL_LIBRARIES}
+)
+
+install(TARGETS ${PROJECT_NAME}_mono ${PROJECT_NAME}_stereo ${PROJECT_NAME}_rgbd ${PROJECT_NAME}_lidar
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

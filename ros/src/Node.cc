@@ -13,9 +13,7 @@ Node::Node (ORB_SLAM2::System::eSensor sensor, ros::NodeHandle &node_handle, ima
 Node::~Node () {
   // Stop all threads
   orb_slam_->Shutdown();
-
-  // Save camera trajectory
-  orb_slam_->SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
+  ROS_INFO("SLAM SHUTDOWN");
 
   delete orb_slam_;
 }
@@ -29,7 +27,7 @@ void Node::Init () {
   node_handle_.param<std::string>(name_of_node_+ "/camera_frame_id", camera_frame_id_param_, "camera_link");
   node_handle_.param<std::string>(name_of_node_+ "/target_frame_id", target_frame_id_param_, "base_link");
   node_handle_.param<std::string>(name_of_node_ + "/map_file", map_file_name_param_, "map.bin");
-  node_handle_.param<std::string>(name_of_node_ + "/voc_file", voc_file_name_param_, "file_not_set");
+  node_handle_.param<std::string>(name_of_node_ + "/voc_file", voc_file_name_param_, "/home/valts/catkin_ws/src/orb_slam_2_ros/orb_slam2/Vocabulary/ORBvoc.txt");
   node_handle_.param(name_of_node_ + "/load_map", load_map_param_, false);
 
    // Create a parameters object to pass to the Tracking system
@@ -38,12 +36,12 @@ void Node::Init () {
 
   orb_slam_ = new ORB_SLAM2::System (voc_file_name_param_, sensor_, parameters, map_file_name_param_, load_map_param_);
 
-  service_server_ = node_handle_.advertiseService(name_of_node_+"/save_map", &Node::SaveMapSrv, this);
+  //service_server_ = node_handle_.advertiseService(name_of_node_+"/save_map", &Node::SaveMapSrv, this);
 
   //Setup dynamic reconfigure
-  dynamic_reconfigure::Server<orb_slam2_ros::dynamic_reconfigureConfig>::CallbackType dynamic_param_callback;
-  dynamic_param_callback = boost::bind(&Node::ParamsChangedCallback, this, _1, _2);
-  dynamic_param_server_.setCallback(dynamic_param_callback);
+//  dynamic_reconfigure::Server<orb_slam2_ros::dynamic_reconfigureConfig>::CallbackType dynamic_param_callback;
+//  dynamic_param_callback = boost::bind(&Node::ParamsChangedCallback, this, _1, _2);
+//  dynamic_param_server_.setCallback(dynamic_param_callback);
 
   // Initialization transformation listener
   tfBuffer.reset(new tf2_ros::Buffer);
@@ -113,7 +111,7 @@ tf2::Transform Node::TransformToTarget (tf2::Transform tf_in, std::string frame_
     tf_orig2target.setIdentity();
   }
 
-  /* 
+  /*
     // Print debug info
     double roll, pitch, yaw;
     // Print debug map2orig
@@ -276,38 +274,39 @@ sensor_msgs::PointCloud2 Node::MapPointsToPointCloud (std::vector<ORB_SLAM2::Map
 }
 
 
-void Node::ParamsChangedCallback(orb_slam2_ros::dynamic_reconfigureConfig &config, uint32_t level) {
-  orb_slam_->EnableLocalizationOnly (config.localize_only);
-  min_observations_per_point_ = config.min_observations_for_ros_map;
+//void Node::ParamsChangedCallback(orb_slam2_ros::dynamic_reconfigureConfig &config, uint32_t level) {
+//  orb_slam_->EnableLocalizationOnly (config.localize_only);
+//  min_observations_per_point_ = config.min_observations_for_ros_map;
+//
+//  if (config.reset_map) {
+//    orb_slam_->Reset();
+//    config.reset_map = false;
+//  }
+//
+//  orb_slam_->SetMinimumKeyFrames (config.min_num_kf_in_map);
+//}
 
-  if (config.reset_map) {
-    orb_slam_->Reset();
-    config.reset_map = false;
-  }
 
-  orb_slam_->SetMinimumKeyFrames (config.min_num_kf_in_map);
-}
-
-
-bool Node::SaveMapSrv (orb_slam2_ros::SaveMap::Request &req, orb_slam2_ros::SaveMap::Response &res) {
-  res.success = orb_slam_->SaveMap(req.name);
-
-  if (res.success) {
-    ROS_INFO_STREAM ("Map was saved as " << req.name);
-  } else {
-    ROS_ERROR ("Map could not be saved.");
-  }
-
-  return res.success;
-}
+//bool Node::SaveMapSrv (orb_slam2_ros::SaveMap::Request &req, orb_slam2_ros::SaveMap::Response &res) {
+//  orb_slam_ -> SaveTrajectoryKITTI("orb_kitti_traj.txt", "Orb_timestampts.txt");
+//  res.success = orb_slam_->SaveMap(req.name);
+//
+//  if (res.success) {
+//    ROS_INFO_STREAM ("Map was saved as " << req.name);
+//  } else {
+//    ROS_ERROR ("Map could not be saved.");
+//  }
+//
+//  return res.success;
+//}
 
 
 void Node::LoadOrbParameters (ORB_SLAM2::ORBParameters& parameters) {
   //ORB SLAM configuration parameters
-  node_handle_.param(name_of_node_ + "/camera_fps", parameters.maxFrames, 30);
+  node_handle_.param(name_of_node_ + "/camera_fps", parameters.maxFrames, 10);
   node_handle_.param(name_of_node_ + "/camera_rgb_encoding", parameters.RGB, true);
-  node_handle_.param(name_of_node_ + "/ORBextractor/nFeatures", parameters.nFeatures, 1200);
-  node_handle_.param(name_of_node_ + "/ORBextractor/scaleFactor", parameters.scaleFactor, static_cast<float>(1.2));
+  node_handle_.param(name_of_node_ + "/ORBextractor/nFeatures", parameters.nFeatures, 3000);
+  node_handle_.param(name_of_node_ + "/ORBextractor/scaleFactor", parameters.scaleFactor, static_cast<float>(0.95));
   node_handle_.param(name_of_node_ + "/ORBextractor/nLevels", parameters.nLevels, 8);
   node_handle_.param(name_of_node_ + "/ORBextractor/iniThFAST", parameters.iniThFAST, 20);
   node_handle_.param(name_of_node_ + "/ORBextractor/minThFAST", parameters.minThFAST, 7);
@@ -315,8 +314,8 @@ void Node::LoadOrbParameters (ORB_SLAM2::ORBParameters& parameters) {
   bool load_calibration_from_cam = false;
   node_handle_.param(name_of_node_ + "/load_calibration_from_cam", load_calibration_from_cam, false);
 
-  if (sensor_== ORB_SLAM2::System::STEREO || sensor_==ORB_SLAM2::System::RGBD) {
-    node_handle_.param(name_of_node_ + "/ThDepth", parameters.thDepth, static_cast<float>(35.0));
+  if (sensor_== ORB_SLAM2::System::STEREO || sensor_==ORB_SLAM2::System::RGBD || sensor_==ORB_SLAM2::System::LIDAR) {
+    node_handle_.param(name_of_node_ + "/ThDepth", parameters.thDepth, static_cast<float>(50.0));
     node_handle_.param(name_of_node_ + "/depth_map_factor", parameters.depthMapFactor, static_cast<float>(1.0));
   }
 
@@ -343,19 +342,30 @@ void Node::LoadOrbParameters (ORB_SLAM2::ORBParameters& parameters) {
   }
 
   bool got_cam_calibration = true;
-  if (sensor_== ORB_SLAM2::System::STEREO || sensor_==ORB_SLAM2::System::RGBD) {
-    got_cam_calibration &= node_handle_.getParam(name_of_node_ + "/camera_baseline", parameters.baseline);
-  }
+//  if (sensor_== ORB_SLAM2::System::STEREO || sensor_==ORB_SLAM2::System::RGBD || sensor_==ORB_SLAM2::System::LIDAR) {
+//    got_cam_calibration &= node_handle_.getParam(name_of_node_ + "/camera_baseline", parameters.baseline);
+//  }
+//
+//  got_cam_calibration &= node_handle_.getParam(name_of_node_ + "/camera_fx", parameters.fx);
+//  got_cam_calibration &= node_handle_.getParam(name_of_node_ + "/camera_fy", parameters.fy);
+//  got_cam_calibration &= node_handle_.getParam(name_of_node_ + "/camera_cx", parameters.cx);
+//  got_cam_calibration &= node_handle_.getParam(name_of_node_ + "/camera_cy", parameters.cy);
+//  got_cam_calibration &= node_handle_.getParam(name_of_node_ + "/camera_k1", parameters.k1);
+//  got_cam_calibration &= node_handle_.getParam(name_of_node_ + "/camera_k2", parameters.k2);
+//  got_cam_calibration &= node_handle_.getParam(name_of_node_ + "/camera_p1", parameters.p1);
+//  got_cam_calibration &= node_handle_.getParam(name_of_node_ + "/camera_p2", parameters.p2);
+//  got_cam_calibration &= node_handle_.getParam(name_of_node_ + "/camera_k3", parameters.k3);
 
-  got_cam_calibration &= node_handle_.getParam(name_of_node_ + "/camera_fx", parameters.fx);
-  got_cam_calibration &= node_handle_.getParam(name_of_node_ + "/camera_fy", parameters.fy);
-  got_cam_calibration &= node_handle_.getParam(name_of_node_ + "/camera_cx", parameters.cx);
-  got_cam_calibration &= node_handle_.getParam(name_of_node_ + "/camera_cy", parameters.cy);
-  got_cam_calibration &= node_handle_.getParam(name_of_node_ + "/camera_k1", parameters.k1);
-  got_cam_calibration &= node_handle_.getParam(name_of_node_ + "/camera_k2", parameters.k2);
-  got_cam_calibration &= node_handle_.getParam(name_of_node_ + "/camera_p1", parameters.p1);
-  got_cam_calibration &= node_handle_.getParam(name_of_node_ + "/camera_p2", parameters.p2);
-  got_cam_calibration &= node_handle_.getParam(name_of_node_ + "/camera_k3", parameters.k3);
+parameters.baseline = 1;
+parameters.fx = 1;
+parameters.fy = 1;
+parameters.cx = 1;
+parameters.cy = 1;
+parameters.k1 = 0;
+parameters.k2 = 0;
+parameters.p1 = 0;
+parameters.p2 = 0;
+parameters.k3 = 0;
 
   if (!got_cam_calibration) {
     ROS_ERROR ("Failed to get camera calibration parameters from the launch file.");
